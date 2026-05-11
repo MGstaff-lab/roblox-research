@@ -52,6 +52,7 @@
 
   .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
   .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
   .btn-danger { background: var(--red); color: #fff; }
@@ -64,9 +65,15 @@
   thead th.sorted { color: var(--accent); }
   thead th .sort-icon { margin-left: 4px; opacity: 0.4; }
   thead th.sorted .sort-icon { opacity: 1; }
+  thead th.cb-col { cursor: default; width: 36px; padding: 11px 10px; }
   tbody tr { border-top: 1px solid var(--border); transition: background .1s; }
   tbody tr:hover { background: var(--surface2); }
+  tbody tr.row-selected { background: rgba(108,99,255,0.08); }
   td { padding: 10px 14px; vertical-align: middle; white-space: nowrap; }
+  td.cb-col { padding: 10px; width: 36px; }
+
+  /* Checkboxes */
+  input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 
   .channel-name a { color: var(--text); text-decoration: none; font-weight: 500; }
   .channel-name a:hover { color: var(--accent); }
@@ -130,6 +137,31 @@
   .toast.show { opacity: 1; transform: translateY(0); }
   .toast.success { border-color: var(--green); color: var(--green); }
   .toast.error   { border-color: var(--red);   color: var(--red); }
+
+  /* Batch action bar */
+  .batch-bar {
+    position: fixed;
+    bottom: -90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 150;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    transition: bottom .25s cubic-bezier(.34,1.56,.64,1);
+    white-space: nowrap;
+    flex-wrap: wrap;
+  }
+  .batch-bar.visible { bottom: 24px; }
+  .batch-bar-count { font-size: 0.85rem; font-weight: 600; color: var(--accent); min-width: 80px; }
+  .batch-bar select { padding: 7px 10px; font-size: 0.82rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); }
+  .batch-bar input[type=text] { padding: 7px 10px; font-size: 0.82rem; background: var(--surface2); border: 1px solid var(--accent); border-radius: 8px; color: var(--text); outline: none; width: 150px; }
+  .batch-bar .divider { width: 1px; height: 24px; background: var(--border); }
 </style>
 </head>
 <body>
@@ -166,6 +198,7 @@
     <table>
       <thead>
         <tr>
+          <th class="cb-col"><input type="checkbox" id="sa-channel" onchange="toggleSelectAll('channel',this.checked)" title="Select all"></th>
           <th onclick="sortChannels('name')">Channel <span class="sort-icon" id="si-name">↕</span></th>
           <th onclick="sortChannels('niche')">Niche <span class="sort-icon" id="si-niche">↕</span></th>
           <th onclick="sortChannels('subscribers')" class="num sorted">Subscribers <span class="sort-icon" id="si-subscribers">↓</span></th>
@@ -176,7 +209,7 @@
           <th onclick="sortChannels('est_monthly_revenue')" class="num">Est. Mo. Revenue <span class="sort-icon" id="si-est_monthly_revenue">↕</span></th>
         </tr>
       </thead>
-      <tbody id="ch-body"><tr><td colspan="8" class="state-msg">Loading…</td></tr></tbody>
+      <tbody id="ch-body"><tr><td colspan="9" class="state-msg">Loading…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -270,6 +303,18 @@
   </div>
 </div>
 
+<!-- BATCH ACTION BAR -->
+<div class="batch-bar" id="batch-bar">
+  <span class="batch-bar-count" id="bb-count">0 selected</span>
+  <div class="divider"></div>
+  <select id="bb-niche-sel" onchange="handleBbNicheChange()">
+    <option value="">— Set niche —</option>
+  </select>
+  <input type="text" id="bb-niche-custom" placeholder="Custom niche…" style="display:none">
+  <button class="btn btn-primary" id="bb-apply-btn" onclick="applyBatchNiche()">Apply to Selected</button>
+  <button class="btn btn-ghost" onclick="clearSelection()">Clear</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -285,6 +330,8 @@ let allVideos   = [];
 let chSortKey = 'subscribers';
 let chSortDir = -1;
 let fetchedChannelData = null;
+let selectedChannelIds = new Set();
+let selectedVideoIds   = new Set();
 
 // ── YouTube API ─────────────────────────────────────────────────────────────
 async function fetchYouTubeChannel(url) {
@@ -360,6 +407,14 @@ function populateDynamicDropdowns() {
     if (!el) return;
     el.innerHTML = '<option value="">— Select niche —</option>' + modalOpts;
   });
+
+  // Batch bar niche selector
+  const bbSel = document.getElementById('bb-niche-sel');
+  if (bbSel) {
+    const prev = bbSel.value;
+    bbSel.innerHTML = '<option value="">— Set niche —</option>' + modalOpts;
+    if (prev) bbSel.value = prev;
+  }
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -451,6 +506,7 @@ function showToast(msg, type = '') {
 function switchTab(id) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['channels','videos'][i] === id));
   document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === 'tab-' + id));
+  updateBatchBar();
 }
 
 // ── Channels ───────────────────────────────────────────────────────────────
@@ -493,21 +549,27 @@ function renderChannels() {
   document.getElementById('ch-count').textContent = rows.length + ' channel' + (rows.length !== 1 ? 's' : '');
 
   document.getElementById('ch-body').innerHTML = rows.length === 0
-    ? '<tr><td colspan="8" class="state-msg">No channels match your filters.</td></tr>'
-    : rows.map(ch => `
-      <tr>
-        <td class="channel-name">
-          <a href="${ch.url}" target="_blank" rel="noopener">${ch.name}</a>
-          ${ch.is_legacy_channel ? '<span class="legacy-tag">legacy</span>' : ''}
-        </td>
-        <td id="ch-niche-${ch.id}" class="niche-cell" data-type="channel" data-id="${ch.id}" data-niche="${(ch.niche||'').replace(/"/g,'&quot;')}" onclick="startNicheEdit(this)"><span class="niche-badge ${nicheClass(ch.niche)}">${nicheLabel(ch.niche)}</span><span class="edit-hint">✏</span></td>
-        <td class="num">${fmtSubs(ch.subscribers)}</td>
-        <td>${fmtDate(ch.date_started)}</td>
-        <td class="num">${ch.total_videos != null ? ch.total_videos.toLocaleString() : '—'}</td>
-        <td class="num">${ch.uploads_per_week != null ? ch.uploads_per_week + '/wk' : '—'}</td>
-        <td class="num">${fmtViews(ch.avg_views_per_video)}</td>
-        <td class="num revenue">${fmtRevenue(ch.est_monthly_revenue)}</td>
-      </tr>`).join('');
+    ? '<tr><td colspan="9" class="state-msg">No channels match your filters.</td></tr>'
+    : rows.map(ch => {
+        const checked = selectedChannelIds.has(ch.id) ? 'checked' : '';
+        return `<tr class="${selectedChannelIds.has(ch.id) ? 'row-selected' : ''}">
+          <td class="cb-col"><input type="checkbox" class="row-cb" data-type="channel" data-id="${ch.id}" ${checked} onchange="toggleSelect('channel','${ch.id}',this.checked)"></td>
+          <td class="channel-name">
+            <a href="${ch.url}" target="_blank" rel="noopener">${ch.name}</a>
+            ${ch.is_legacy_channel ? '<span class="legacy-tag">legacy</span>' : ''}
+          </td>
+          <td id="ch-niche-${ch.id}" class="niche-cell" data-type="channel" data-id="${ch.id}" data-niche="${(ch.niche||'').replace(/"/g,'&quot;')}" onclick="startNicheEdit(this)"><span class="niche-badge ${nicheClass(ch.niche)}">${nicheLabel(ch.niche)}</span><span class="edit-hint">✏</span></td>
+          <td class="num">${fmtSubs(ch.subscribers)}</td>
+          <td>${fmtDate(ch.date_started)}</td>
+          <td class="num">${ch.total_videos != null ? ch.total_videos.toLocaleString() : '—'}</td>
+          <td class="num">${ch.uploads_per_week != null ? ch.uploads_per_week + '/wk' : '—'}</td>
+          <td class="num">${fmtViews(ch.avg_views_per_video)}</td>
+          <td class="num revenue">${fmtRevenue(ch.est_monthly_revenue)}</td>
+        </tr>`;
+      }).join('');
+
+  syncSelectAll('channel');
+  updateBatchBar();
 }
 
 // ── Videos ─────────────────────────────────────────────────────────────────
@@ -545,18 +607,123 @@ function renderVideos() {
     ? '<div class="empty-state"><div class="icon">📹</div><h3>No videos match</h3><p>Try adjusting your filters.</p></div>'
     : `<div class="table-wrap"><table>
         <thead><tr>
+          <th class="cb-col"><input type="checkbox" id="sa-video" onchange="toggleSelectAll('video',this.checked)" title="Select all"></th>
           <th>Title</th><th>Channel</th><th>Niche</th>
           <th class="num">Views</th><th>Published</th>
         </tr></thead>
-        <tbody>${rows.map(v => `
-          <tr>
+        <tbody>${rows.map(v => {
+          const checked = selectedVideoIds.has(v.id) ? 'checked' : '';
+          return `<tr class="${selectedVideoIds.has(v.id) ? 'row-selected' : ''}">
+            <td class="cb-col"><input type="checkbox" class="row-cb" data-type="video" data-id="${v.id}" ${checked} onchange="toggleSelect('video','${v.id}',this.checked)"></td>
             <td><a href="${v.url||'#'}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:500">${v.title}</a></td>
             <td style="color:var(--muted)">${v.channel_name||'—'}</td>
             <td id="vid-niche-${v.id}" class="niche-cell" data-type="video" data-id="${v.id}" data-niche="${(v.niche||'').replace(/"/g,'&quot;')}" onclick="startNicheEdit(this)"><span class="niche-badge ${nicheClass(v.niche)}">${nicheLabel(v.niche)}</span><span class="edit-hint">✏</span></td>
             <td class="num">${fmtViews(v.views)}</td>
             <td>${fmtDate(v.published_date)}</td>
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
         </tbody></table></div>`;
+
+  syncSelectAll('video');
+  updateBatchBar();
+}
+
+// ── Selection logic ─────────────────────────────────────────────────────────
+function toggleSelect(type, id, checked) {
+  const set = type === 'channel' ? selectedChannelIds : selectedVideoIds;
+  if (checked) set.add(id);
+  else set.delete(id);
+  // Highlight the row
+  const cb = document.querySelector(`.row-cb[data-type="${type}"][data-id="${id}"]`);
+  if (cb) cb.closest('tr').classList.toggle('row-selected', checked);
+  syncSelectAll(type);
+  updateBatchBar();
+}
+
+function toggleSelectAll(type, checked) {
+  const set = type === 'channel' ? selectedChannelIds : selectedVideoIds;
+  document.querySelectorAll(`.row-cb[data-type="${type}"]`).forEach(cb => {
+    cb.checked = checked;
+    cb.closest('tr').classList.toggle('row-selected', checked);
+    if (checked) set.add(cb.dataset.id);
+    else set.delete(cb.dataset.id);
+  });
+  updateBatchBar();
+}
+
+function syncSelectAll(type) {
+  const cbs = Array.from(document.querySelectorAll(`.row-cb[data-type="${type}"]`));
+  const sa  = document.getElementById(`sa-${type}`);
+  if (!sa || cbs.length === 0) return;
+  const allChecked = cbs.every(cb => cb.checked);
+  const someChecked = cbs.some(cb => cb.checked);
+  sa.checked = allChecked;
+  sa.indeterminate = someChecked && !allChecked;
+}
+
+function clearSelection() {
+  const isChannels = document.getElementById('tab-channels').classList.contains('active');
+  if (isChannels) { selectedChannelIds.clear(); renderChannels(); }
+  else            { selectedVideoIds.clear();   renderVideos();   }
+  updateBatchBar();
+}
+
+// ── Batch action bar ────────────────────────────────────────────────────────
+function updateBatchBar() {
+  const isChannels = document.getElementById('tab-channels').classList.contains('active');
+  const count = (isChannels ? selectedChannelIds : selectedVideoIds).size;
+  document.getElementById('bb-count').textContent = count + ' selected';
+  document.getElementById('batch-bar').classList.toggle('visible', count > 0);
+}
+
+function handleBbNicheChange() {
+  const sel = document.getElementById('bb-niche-sel');
+  const txt = document.getElementById('bb-niche-custom');
+  txt.style.display = sel.value === '__custom__' ? 'inline-block' : 'none';
+  if (sel.value === '__custom__') txt.focus();
+}
+
+async function applyBatchNiche() {
+  const sel = document.getElementById('bb-niche-sel');
+  const txt = document.getElementById('bb-niche-custom');
+  const newNiche = sel.value === '__custom__' ? txt.value.trim() : sel.value;
+  if (!newNiche) { showToast('Select a niche first', 'error'); return; }
+
+  const isChannels = document.getElementById('tab-channels').classList.contains('active');
+  const ids   = Array.from(isChannels ? selectedChannelIds : selectedVideoIds);
+  const table = isChannels ? 'channels' : 'videos';
+
+  const btn = document.getElementById('bb-apply-btn');
+  btn.disabled = true;
+  btn.textContent = 'Updating…';
+
+  let ok = 0, fail = 0;
+  for (let i = 0; i < ids.length; i += 20) {
+    const chunk = ids.slice(i, i + 20);
+    const { error } = await db.from(table).update({ niche: newNiche }).in('id', chunk);
+    if (error) {
+      fail += chunk.length;
+    } else {
+      ok += chunk.length;
+      chunk.forEach(id => {
+        if (isChannels) { const ch = allChannels.find(c => c.id === id); if (ch) ch.niche = newNiche; }
+        else            { const v  = allVideos.find(v => v.id === id);   if (v)  v.niche  = newNiche; }
+      });
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Apply to Selected';
+
+  if (isChannels) { selectedChannelIds.clear(); renderChannels(); }
+  else            { selectedVideoIds.clear();   renderVideos();   }
+  populateDynamicDropdowns();
+  updateBatchBar();
+
+  showToast(
+    `Updated ${ok} record${ok !== 1 ? 's' : ''}${fail ? ` · ${fail} failed` : ''}`,
+    ok ? 'success' : 'error'
+  );
 }
 
 // ── Niche inline editing ────────────────────────────────────────────────────
