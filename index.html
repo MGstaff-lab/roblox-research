@@ -128,6 +128,28 @@
   /* Video filters */
   .video-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
 
+  /* Niche multi-filter */
+  .niche-filter-wrap { position: relative; }
+  .niche-filter-btn { padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; cursor: pointer; white-space: nowrap; transition: border-color .15s, color .15s; }
+  .niche-filter-btn:hover { border-color: var(--accent); }
+  .niche-filter-btn.active { border-color: var(--accent); color: var(--accent); }
+  .niche-filter-panel { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px; z-index: 60; min-width: 230px; box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
+  .niche-filter-panel.open { display: block; }
+  .niche-filter-item { display: flex; align-items: center; gap: 10px; padding: 7px 6px; cursor: pointer; border-radius: 6px; font-size: 0.84rem; user-select: none; }
+  .niche-filter-item:hover { background: var(--surface2); }
+  .niche-state-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); background: none; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; transition: all .15s; }
+  .niche-state-dot.include { border-color: var(--green); background: var(--green); color: #fff; }
+  .niche-state-dot.exclude { border-color: var(--red);   background: var(--red);   color: #fff; }
+  .niche-clear-btn { width: 100%; margin-top: 6px; padding: 6px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.78rem; cursor: pointer; }
+  .niche-clear-btn:hover { color: var(--text); border-color: var(--text); }
+
+  /* Exclude keywords */
+  .excl-kw-wrap { position: relative; }
+  .excl-kw-wrap::before { content: "✕"; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--red); font-size: 0.7rem; pointer-events: none; opacity: 0.7; }
+  .excl-kw-wrap input { padding: 8px 12px 8px 26px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; outline: none; width: 180px; transition: border-color .15s; }
+  .excl-kw-wrap input:focus { border-color: var(--red); }
+  .excl-kw-wrap input:not(:placeholder-shown) { border-color: rgba(244,67,54,0.5); }
+
   /* Views range slider */
   .views-filter-group { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
   .views-filter-header { display: flex; justify-content: space-between; align-items: center; }
@@ -255,9 +277,16 @@
     <select id="vid-channel" onchange="renderVideos()">
       <option value="">All Channels</option>
     </select>
-    <select id="vid-niche" onchange="renderVideos()">
-      <option value="">All Niches</option>
-    </select>
+    <div class="niche-filter-wrap" id="niche-filter-wrap">
+      <button class="niche-filter-btn" id="niche-filter-btn" onclick="toggleNichePanel(event)">All Niches ▾</button>
+      <div class="niche-filter-panel" id="niche-filter-panel">
+        <div id="niche-filter-list"></div>
+        <button class="niche-clear-btn" onclick="clearNicheFilter()">Clear filter</button>
+      </div>
+    </div>
+    <div class="excl-kw-wrap">
+      <input type="text" id="vid-exclude-kw" placeholder="Exclude keywords…" title="Comma-separated. Hides videos whose title contains these words." oninput="renderVideos()">
+    </div>
     <div class="views-filter-group">
       <div class="views-filter-header">
         <span class="views-filter-label">Views</span>
@@ -359,6 +388,7 @@ let fetchedChannelData = null;
 let selectedChannelIds = new Set();
 let selectedVideoIds   = new Set();
 let viewsSliderMax = 10000000;
+let nicheFilterState = new Map(); // nicheName -> 'include' | 'exclude'
 
 // ── YouTube API ─────────────────────────────────────────────────────────────
 async function fetchYouTubeChannel(url) {
@@ -421,7 +451,7 @@ function populateDynamicDropdowns() {
   const modalOpts  = niches.map(n => `<option value="${n}">${n}</option>`).join('') +
                      '<option value="__custom__">Custom…</option>';
 
-  ['ch-niche','vid-niche'].forEach(id => {
+  ['ch-niche'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const prev = el.value;
@@ -600,6 +630,68 @@ function renderChannels() {
   updateBatchBar();
 }
 
+// ── Niche multi-filter panel ────────────────────────────────────────────────
+function toggleNichePanel(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('niche-filter-panel');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  if (!isOpen) renderNicheFilterList();
+}
+
+function renderNicheFilterList() {
+  const niches = getAllNiches();
+  document.getElementById('niche-filter-list').innerHTML = niches.map(n => {
+    const state = nicheFilterState.get(n) || 'neutral';
+    const icon  = state === 'include' ? '✓' : state === 'exclude' ? '✕' : '';
+    return `<div class="niche-filter-item" data-niche="${n.replace(/"/g,'&quot;')}" onclick="handleNicheItemClick(this)">
+      <span class="niche-state-dot ${state}">${icon}</span>
+      <span>${n}</span>
+    </div>`;
+  }).join('');
+}
+
+function handleNicheItemClick(el) {
+  const niche = el.dataset.niche;
+  const cur  = nicheFilterState.get(niche) || 'neutral';
+  const next = cur === 'neutral' ? 'include' : cur === 'include' ? 'exclude' : 'neutral';
+  if (next === 'neutral') nicheFilterState.delete(niche);
+  else nicheFilterState.set(niche, next);
+  renderNicheFilterList();
+  updateNicheFilterBtn();
+  renderVideos();
+}
+
+function clearNicheFilter() {
+  nicheFilterState.clear();
+  renderNicheFilterList();
+  updateNicheFilterBtn();
+  renderVideos();
+}
+
+function updateNicheFilterBtn() {
+  const included = [...nicheFilterState.entries()].filter(([,s]) => s === 'include');
+  const excluded = [...nicheFilterState.entries()].filter(([,s]) => s === 'exclude');
+  const btn = document.getElementById('niche-filter-btn');
+  if (!btn) return;
+  if (!included.length && !excluded.length) {
+    btn.textContent = 'All Niches ▾';
+    btn.classList.remove('active');
+  } else {
+    const parts = [];
+    if (included.length) parts.push(included.length + ' shown');
+    if (excluded.length) parts.push(excluded.length + ' hidden');
+    btn.textContent = parts.join(' · ') + ' ▾';
+    btn.classList.add('active');
+  }
+}
+
+// Close niche panel when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('niche-filter-wrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('niche-filter-panel').classList.remove('open');
+});
+
 // ── Views slider ───────────────────────────────────────────────────────────
 function sliderToViews(pos) {
   if (pos === 0) return 0;
@@ -655,11 +747,13 @@ function renderVideos() {
   const sortVal    = document.getElementById('vid-sort').value;
   const dateDays   = parseInt(document.getElementById('vid-date').value) || 0;
   const chanFilter = document.getElementById('vid-channel').value;
-  const nicheFilter= document.getElementById('vid-niche').value;
   const minSliderPos = parseInt(document.getElementById('vid-min-slider').value);
   const maxSliderPos = parseInt(document.getElementById('vid-max-slider').value);
   const minViews = minSliderPos > 0   ? sliderToViews(minSliderPos) : null;
   const maxViews = maxSliderPos < 100 ? sliderToViews(maxSliderPos) : null;
+  const includedNiches = [...nicheFilterState.entries()].filter(([,s]) => s === 'include').map(([n]) => n);
+  const excludedNiches = [...nicheFilterState.entries()].filter(([,s]) => s === 'exclude').map(([n]) => n);
+  const excludeKws = (document.getElementById('vid-exclude-kw')?.value || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
 
   if (allVideos.length === 0) return;
 
@@ -667,8 +761,10 @@ function renderVideos() {
 
   let rows = allVideos.filter(v => {
     if (chanFilter && v.channel_name !== chanFilter) return false;
-    if (nicheFilter && v.niche !== nicheFilter) return false;
+    if (excludedNiches.length && excludedNiches.includes(v.niche)) return false;
+    if (includedNiches.length && !includedNiches.includes(v.niche)) return false;
     if (query && !(v.title || '').toLowerCase().includes(query)) return false;
+    if (excludeKws.length && excludeKws.some(kw => (v.title || '').toLowerCase().includes(kw))) return false;
     if (cutoff && v.published_date && new Date(v.published_date) < cutoff) return false;
     if (minViews !== null && (v.views || 0) < minViews) return false;
     if (maxViews !== null && (v.views || 0) > maxViews) return false;
