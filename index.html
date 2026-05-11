@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roblox Shorts Research</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d12;
+    --surface: #16161e;
+    --surface2: #1e1e2a;
+    --border: #2a2a38;
+    --text: #e2e2ec;
+    --muted: #7a7a94;
+    --accent: #6c63ff;
+    --tsunami: #00b4d8;
+    --troll: #ef5350;
+    --nights: #66bb6a;
+    --green: #4caf50;
+    --red: #f44336;
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header { padding: 20px 28px 0; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 16px; }
+  header h1 span { color: var(--accent); }
+
+  .tabs { display: flex; gap: 4px; }
+  .tab-btn { padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: color .15s, border-color .15s; }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; padding: 20px 28px; }
+  .tab-content.active { display: block; }
+
+  /* Controls */
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .search-box { flex: 1; min-width: 200px; max-width: 340px; position: relative; }
+  .search-box input { width: 100%; padding: 8px 12px 8px 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; outline: none; transition: border-color .15s; }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box::before { content: "⌕"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 1.1rem; pointer-events: none; }
+
+  select { padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; outline: none; cursor: pointer; }
+  select:focus { border-color: var(--accent); }
+  select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .stats-bar { font-size: 0.8rem; color: var(--muted); }
+
+  .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .btn-danger { background: var(--red); color: #fff; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead th { background: var(--surface); padding: 11px 14px; text-align: left; font-weight: 600; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; cursor: pointer; user-select: none; transition: color .15s; }
+  thead th:hover { color: var(--text); }
+  thead th.sorted { color: var(--accent); }
+  thead th .sort-icon { margin-left: 4px; opacity: 0.4; }
+  thead th.sorted .sort-icon { opacity: 1; }
+  tbody tr { border-top: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 10px 14px; vertical-align: middle; white-space: nowrap; }
+
+  .channel-name a { color: var(--text); text-decoration: none; font-weight: 500; }
+  .channel-name a:hover { color: var(--accent); }
+  .legacy-tag { font-size: 0.68rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+
+  .niche-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+  .niche-tsunami { background: rgba(0,180,216,0.15); color: var(--tsunami); }
+  .niche-troll   { background: rgba(239,83,80,0.15);  color: var(--troll); }
+  .niche-nights  { background: rgba(102,187,106,0.15); color: var(--nights); }
+  .niche-other   { background: rgba(108,99,255,0.15); color: var(--accent); }
+
+  .niche-cell { cursor: pointer; white-space: nowrap; }
+  .niche-cell:hover .edit-hint { opacity: 0.6; }
+  .edit-hint { font-size: 0.65rem; margin-left: 5px; opacity: 0; transition: opacity .15s; color: var(--muted); }
+  .niche-editor { display: flex; align-items: center; gap: 4px; }
+  .niche-editor select, .niche-editor input[type=text] { padding: 3px 6px; font-size: 0.78rem; background: var(--surface2); border: 1px solid var(--accent); border-radius: 6px; color: var(--text); outline: none; }
+  .niche-editor select { max-width: 170px; }
+  .niche-editor input[type=text] { width: 130px; }
+  .ne-save   { padding: 3px 8px; background: var(--accent); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+  .ne-cancel { padding: 3px 8px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+
+  .modal-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .modal-tab { padding: 8px 20px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; font-size: 0.875rem; font-weight: 500; transition: color .15s, border-color .15s; margin-bottom: -1px; }
+  .modal-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  #batch-urls { width: 100%; padding: 9px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; outline: none; resize: vertical; font-family: inherit; line-height: 1.5; }
+  #batch-urls:focus { border-color: var(--accent); }
+  .batch-progress { font-size: 0.82rem; color: var(--muted); min-height: 18px; margin-top: 6px; }
+
+  .num { text-align: right; }
+  .revenue { font-weight: 600; }
+
+  /* Legend */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 0.78rem; color: var(--muted); align-items: center; }
+
+  /* Loading / empty */
+  .state-msg { padding: 60px 20px; text-align: center; color: var(--muted); font-size: 0.9rem; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 480px; max-width: 95vw; }
+  .modal h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+  .modal p { font-size: 0.83rem; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  .form-group input, .form-group select { width: 100%; padding: 9px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; outline: none; }
+  .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal-error { font-size: 0.8rem; color: var(--red); margin-top: 8px; display: none; }
+  .modal-success { font-size: 0.8rem; color: var(--green); margin-top: 8px; display: none; }
+
+  /* Video filters */
+  .video-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; color: var(--muted); text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 1rem; margin-bottom: 6px; color: var(--text); }
+  .empty-state p { font-size: 0.85rem; max-width: 360px; line-height: 1.6; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; font-size: 0.85rem; box-shadow: 0 4px 20px rgba(0,0,0,0.4); opacity: 0; transform: translateY(8px); transition: all .2s; z-index: 200; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error   { border-color: var(--red);   color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Roblox Shorts <span>Research</span></h1>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('channels')">Channels</button>
+    <button class="tab-btn" onclick="switchTab('videos')">Videos</button>
+  </div>
+</header>
+
+<!-- CHANNELS TAB -->
+<div id="tab-channels" class="tab-content active">
+  <div class="controls">
+    <div class="search-box">
+      <input type="text" id="ch-search" placeholder="Search channels…" oninput="renderChannels()">
+    </div>
+    <select id="ch-niche" onchange="renderChannels()">
+      <option value="">All Niches</option>
+    </select>
+    <button class="btn btn-primary" onclick="openAddChannel()">+ Add Channel</button>
+    <span class="stats-bar" id="ch-count"></span>
+  </div>
+
+  <div class="legend">
+    <span class="niche-badge niche-tsunami">Escape Tsunami</span>
+    <span class="niche-badge niche-troll">Troll Tower</span>
+    <span class="niche-badge niche-nights">99 Nights</span>
+    <span style="margin-left:4px;font-size:0.78rem;color:var(--muted)"><b>legacy</b> = uploads/wk understated</span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortChannels('name')">Channel <span class="sort-icon" id="si-name">↕</span></th>
+          <th onclick="sortChannels('niche')">Niche <span class="sort-icon" id="si-niche">↕</span></th>
+          <th onclick="sortChannels('subscribers')" class="num sorted">Subscribers <span class="sort-icon" id="si-subscribers">↓</span></th>
+          <th onclick="sortChannels('date_started')">Date Started <span class="sort-icon" id="si-date_started">↕</span></th>
+          <th onclick="sortChannels('total_videos')" class="num">Videos <span class="sort-icon" id="si-total_videos">↕</span></th>
+          <th onclick="sortChannels('uploads_per_week')" class="num">Uploads/Wk <span class="sort-icon" id="si-uploads_per_week">↕</span></th>
+          <th onclick="sortChannels('avg_views_per_video')" class="num">Avg Views <span class="sort-icon" id="si-avg_views_per_video">↕</span></th>
+          <th onclick="sortChannels('est_monthly_revenue')" class="num">Est. Mo. Revenue <span class="sort-icon" id="si-est_monthly_revenue">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="ch-body"><tr><td colspan="8" class="state-msg">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- VIDEOS TAB -->
+<div id="tab-videos" class="tab-content">
+  <div class="video-filters">
+    <div class="search-box">
+      <input type="text" id="vid-search" placeholder="Search video titles…" oninput="renderVideos()">
+    </div>
+    <select id="vid-sort" onchange="renderVideos()">
+      <option value="views_desc">Most Views</option>
+      <option value="views_asc">Least Views</option>
+      <option value="date_desc">Newest First</option>
+      <option value="date_asc">Oldest First</option>
+    </select>
+    <select id="vid-date" onchange="renderVideos()">
+      <option value="">All Time</option>
+      <option value="1">Last 24 hours</option>
+      <option value="7">Last 7 days</option>
+      <option value="14">Last 2 weeks</option>
+      <option value="30">Last 30 days</option>
+      <option value="60">Last 60 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="180">Last 6 months</option>
+      <option value="365">Last 1 year</option>
+      <option value="730">Last 2 years</option>
+    </select>
+    <select id="vid-channel" onchange="renderVideos()">
+      <option value="">All Channels</option>
+    </select>
+    <select id="vid-niche" onchange="renderVideos()">
+      <option value="">All Niches</option>
+    </select>
+    <span class="stats-bar" id="vid-count"></span>
+  </div>
+  <div id="vid-body"><div class="empty-state"><div class="icon">📹</div><h3>No video data loaded yet</h3><p>Pull videos from channels in a future session to populate this tab. All filters are ready and will activate once video data is added.</p></div></div>
+</div>
+
+<!-- ADD CHANNEL MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <h2>Add Channel</h2>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="mtab-single" onclick="switchModalTab('single')">Single</button>
+      <button class="modal-tab" id="mtab-batch" onclick="switchModalTab('batch')">Batch</button>
+    </div>
+
+    <!-- Single mode -->
+    <div id="modal-single">
+      <div class="form-group">
+        <label>YouTube Channel URL *</label>
+        <input type="url" id="add-url" placeholder="https://youtube.com/@ChannelName">
+      </div>
+      <div class="form-group">
+        <label>Channel Name *</label>
+        <input type="text" id="add-name" placeholder="e.g. BradeyRoblox">
+      </div>
+      <div class="form-group">
+        <label>Niche</label>
+        <select id="add-niche" onchange="handleModalNicheChange('add-niche','add-niche-custom')">
+          <option value="">— Select niche —</option>
+        </select>
+        <input type="text" id="add-niche-custom" placeholder="Enter custom niche…" style="display:none;margin-top:6px;width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.875rem;outline:none;">
+      </div>
+    </div>
+
+    <!-- Batch mode -->
+    <div id="modal-batch" style="display:none">
+      <div class="form-group">
+        <label>YouTube URLs <span style="color:var(--muted);font-weight:400">(one per line)</span></label>
+        <textarea id="batch-urls" rows="7" placeholder="https://youtube.com/@Channel1&#10;https://youtube.com/@Channel2&#10;https://youtube.com/channel/UC..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Niche <span style="color:var(--muted);font-weight:400">(applied to all)</span></label>
+        <select id="batch-niche" onchange="handleModalNicheChange('batch-niche','batch-niche-custom')">
+          <option value="">— Select niche —</option>
+        </select>
+        <input type="text" id="batch-niche-custom" placeholder="Enter custom niche…" style="display:none;margin-top:6px;width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.875rem;outline:none;">
+      </div>
+      <div class="batch-progress" id="batch-progress"></div>
+    </div>
+
+    <div class="modal-error" id="add-error"></div>
+    <div class="modal-success" id="add-success"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeAddChannel()">Cancel</button>
+      <button class="btn btn-primary" id="add-submit-btn" onclick="submitChannel()">Add Channel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://ahpzdwemvunyaumrnxal.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_NPPdURwPz_DEt6JG--haaw_CThnEoQF';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── State ──────────────────────────────────────────────────────────────────
+let allChannels = [];
+let allVideos   = [];
+let chSortKey = 'subscribers';
+let chSortDir = -1;
+
+// ── Niche helpers ───────────────────────────────────────────────────────────
+const PRESET_NICHES = ['Escape Tsunami Brainrot', 'Troll Tower', '99 Nights in the Forest'];
+
+function getAllNiches() {
+  const fromData = [...new Set([
+    ...allChannels.map(c => c.niche).filter(Boolean),
+    ...allVideos.map(v => v.niche).filter(Boolean)
+  ])];
+  const custom = fromData.filter(n => !PRESET_NICHES.includes(n)).sort();
+  return [...PRESET_NICHES, ...custom];
+}
+
+function populateDynamicDropdowns() {
+  const niches = getAllNiches();
+  const filterOpts = niches.map(n => `<option value="${n}">${n}</option>`).join('');
+  const modalOpts  = niches.map(n => `<option value="${n}">${n}</option>`).join('') +
+                     '<option value="__custom__">Custom…</option>';
+
+  ['ch-niche','vid-niche'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = '<option value="">All Niches</option>' + filterOpts;
+    if (prev) el.value = prev;
+  });
+
+  ['add-niche','batch-niche'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '<option value="">— Select niche —</option>' + modalOpts;
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadChannels(), loadVideos()]);
+}
+
+async function loadChannels() {
+  const { data, error } = await db.from('channels').select('*').order('subscribers', { ascending: false });
+  if (error) { showToast('Failed to load channels: ' + error.message, 'error'); return; }
+  allChannels = data || [];
+  renderChannels();
+  populateChannelDropdown();
+  populateDynamicDropdowns();
+}
+
+async function loadVideos() {
+  let all = [];
+  const PAGE = 1000;
+  let offset = 0;
+  while (true) {
+    const url = `${SUPABASE_URL}/rest/v1/videos?select=*&order=views.desc&limit=${PAGE}&offset=${offset}`;
+    const resp = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+    if (!resp.ok) { showToast('Failed to load videos', 'error'); return; }
+    const batch = await resp.json();
+    if (!batch || batch.length === 0) break;
+    all = all.concat(batch);
+    if (batch.length < PAGE) break;
+    offset += PAGE;
+  }
+  allVideos = all;
+  renderVideos();
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmtSubs(n) {
+  if (n == null) return '—';
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 10e6 ? 1 : 2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 100e3 ? 0 : 1) + 'K';
+  return n.toString();
+}
+
+function fmtViews(n) {
+  if (n == null) return '—';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+  return n.toString();
+}
+
+function fmtRevenue(n) {
+  if (n == null || n === 0) return '—';
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+  return '$' + n;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const parts = d.split('-');
+  if (parts[1] === '01' && parts[2] === '01') return parts[0];
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function nicheClass(niche) {
+  if (!niche) return 'niche-other';
+  if (niche.includes('Tsunami')) return 'niche-tsunami';
+  if (niche.includes('Troll'))   return 'niche-troll';
+  if (niche.includes('99'))      return 'niche-nights';
+  return 'niche-other';
+}
+
+function nicheLabel(niche) {
+  if (!niche) return 'Unknown';
+  if (niche.includes('Tsunami')) return 'Escape Tsunami';
+  if (niche.includes('Troll'))   return 'Troll Tower';
+  if (niche.includes('99'))      return '99 Nights';
+  return niche;
+}
+
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => { el.className = 'toast'; }, 3500);
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['channels','videos'][i] === id));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === 'tab-' + id));
+}
+
+// ── Channels ───────────────────────────────────────────────────────────────
+function sortChannels(key) {
+  if (chSortKey === key) { chSortDir *= -1; }
+  else { chSortKey = key; chSortDir = (key === 'name' || key === 'niche' || key === 'date_started') ? 1 : -1; }
+  renderChannels();
+}
+
+function renderChannels() {
+  const query  = document.getElementById('ch-search').value.trim().toLowerCase();
+  const niche  = document.getElementById('ch-niche').value;
+
+  let rows = allChannels.filter(ch => {
+    if (niche && ch.niche !== niche) return false;
+    if (query) {
+      const hay = ((ch.name || '') + ' ' + (ch.niche || '')).toLowerCase();
+      if (!hay.includes(query)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    let av = a[chSortKey], bv = b[chSortKey];
+    if (av == null) av = chSortDir === 1 ? '￿' : -Infinity;
+    if (bv == null) bv = chSortDir === 1 ? '￿' : -Infinity;
+    if (typeof av === 'string') return av.localeCompare(bv) * chSortDir;
+    return (av - bv) * chSortDir;
+  });
+
+  const keys = ['name','niche','subscribers','date_started','total_videos','uploads_per_week','avg_views_per_video','est_monthly_revenue'];
+  keys.forEach(k => {
+    const el = document.getElementById('si-' + k);
+    if (!el) return;
+    const th = el.parentElement;
+    if (k === chSortKey) { el.textContent = chSortDir === -1 ? '↓' : '↑'; th.classList.add('sorted'); }
+    else { el.textContent = '↕'; th.classList.remove('sorted'); }
+  });
+
+  document.getElementById('ch-count').textContent = rows.length + ' channel' + (rows.length !== 1 ? 's' : '');
+
+  document.getElementById('ch-body').innerHTML = rows.length === 0
+    ? '<tr><td colspan="8" class="state-msg">No channels match your filters.</td></tr>'
+    : rows.map(ch => `
+      <tr>
+        <td class="channel-name">
+          <a href="${ch.url}" target="_blank" rel="noopener">${ch.name}</a>
+          ${ch.is_legacy_channel ? '<span class="legacy-tag">legacy</span>' : ''}
+        </td>
+        <td id="ch-niche-${ch.id}" class="niche-cell" data-type="channel" data-id="${ch.id}" data-niche="${(ch.niche||'').replace(/"/g,'&quot;')}" onclick="startNicheEdit(this)"><span class="niche-badge ${nicheClass(ch.niche)}">${nicheLabel(ch.niche)}</span><span class="edit-hint">✏</span></td>
+        <td class="num">${fmtSubs(ch.subscribers)}</td>
+        <td>${fmtDate(ch.date_started)}</td>
+        <td class="num">${ch.total_videos != null ? ch.total_videos.toLocaleString() : '—'}</td>
+        <td class="num">${ch.uploads_per_week != null ? ch.uploads_per_week + '/wk' : '—'}</td>
+        <td class="num">${fmtViews(ch.avg_views_per_video)}</td>
+        <td class="num revenue">${fmtRevenue(ch.est_monthly_revenue)}</td>
+      </tr>`).join('');
+}
+
+// ── Videos ─────────────────────────────────────────────────────────────────
+function populateChannelDropdown() {
+  const sel = document.getElementById('vid-channel');
+  const names = [...new Set(allChannels.map(c => c.name))].sort();
+  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+}
+
+function renderVideos() {
+  const query      = document.getElementById('vid-search').value.trim().toLowerCase();
+  const sortVal    = document.getElementById('vid-sort').value;
+  const dateDays   = parseInt(document.getElementById('vid-date').value) || 0;
+  const chanFilter = document.getElementById('vid-channel').value;
+  const nicheFilter= document.getElementById('vid-niche').value;
+
+  if (allVideos.length === 0) return;
+
+  const cutoff = dateDays ? new Date(Date.now() - dateDays * 864e5) : null;
+
+  let rows = allVideos.filter(v => {
+    if (chanFilter && v.channel_name !== chanFilter) return false;
+    if (nicheFilter && v.niche !== nicheFilter) return false;
+    if (query && !(v.title || '').toLowerCase().includes(query)) return false;
+    if (cutoff && v.published_date && new Date(v.published_date) < cutoff) return false;
+    return true;
+  });
+
+  const sortMap = { views_desc: (a,b) => (b.views||0)-(a.views||0), views_asc: (a,b) => (a.views||0)-(b.views||0), date_desc: (a,b) => (b.published_date||'').localeCompare(a.published_date||''), date_asc: (a,b) => (a.published_date||'').localeCompare(b.published_date||'') };
+  rows.sort(sortMap[sortVal] || sortMap.views_desc);
+
+  document.getElementById('vid-count').textContent = rows.length.toLocaleString() + ' video' + (rows.length !== 1 ? 's' : '');
+
+  document.getElementById('vid-body').innerHTML = rows.length === 0
+    ? '<div class="empty-state"><div class="icon">📹</div><h3>No videos match</h3><p>Try adjusting your filters.</p></div>'
+    : `<div class="table-wrap"><table>
+        <thead><tr>
+          <th>Title</th><th>Channel</th><th>Niche</th>
+          <th class="num">Views</th><th>Published</th>
+        </tr></thead>
+        <tbody>${rows.map(v => `
+          <tr>
+            <td><a href="${v.url||'#'}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:500">${v.title}</a></td>
+            <td style="color:var(--muted)">${v.channel_name||'—'}</td>
+            <td id="vid-niche-${v.id}" class="niche-cell" data-type="video" data-id="${v.id}" data-niche="${(v.niche||'').replace(/"/g,'&quot;')}" onclick="startNicheEdit(this)"><span class="niche-badge ${nicheClass(v.niche)}">${nicheLabel(v.niche)}</span><span class="edit-hint">✏</span></td>
+            <td class="num">${fmtViews(v.views)}</td>
+            <td>${fmtDate(v.published_date)}</td>
+          </tr>`).join('')}
+        </tbody></table></div>`;
+}
+
+// ── Niche inline editing ────────────────────────────────────────────────────
+function startNicheEdit(cell) {
+  if (cell.querySelector('.niche-editor')) return;
+  const type = cell.dataset.type;
+  const id   = cell.dataset.id;
+  const cur  = cell.dataset.niche;
+  const niches = getAllNiches();
+  const isCustom = cur && !niches.includes(cur);
+
+  cell.onclick = null;
+  cell.innerHTML = `<div class="niche-editor">
+    <select id="ne-sel-${id}" onchange="handleNeSelChange('${id}')">
+      ${niches.map(n => `<option value="${n}"${n === cur ? ' selected' : ''}>${n}</option>`).join('')}
+      <option value="__custom__"${isCustom ? ' selected' : ''}>Custom…</option>
+    </select>
+    <input type="text" id="ne-txt-${id}" placeholder="Custom niche…" value="${isCustom ? cur.replace(/"/g,'&quot;') : ''}" style="display:${isCustom ? 'inline-block' : 'none'}">
+    <button class="ne-save"   onclick="saveNicheEdit('${type}','${id}')">✓</button>
+    <button class="ne-cancel" onclick="cancelNicheEdit('${type}')">✕</button>
+  </div>`;
+}
+
+function handleNeSelChange(id) {
+  const sel = document.getElementById(`ne-sel-${id}`);
+  const txt = document.getElementById(`ne-txt-${id}`);
+  txt.style.display = sel.value === '__custom__' ? 'inline-block' : 'none';
+  if (sel.value === '__custom__') txt.focus();
+}
+
+async function saveNicheEdit(type, id) {
+  const sel = document.getElementById(`ne-sel-${id}`);
+  const txt = document.getElementById(`ne-txt-${id}`);
+  const newNiche = sel.value === '__custom__' ? txt.value.trim() : sel.value;
+  if (!newNiche) { showToast('Enter a niche name', 'error'); return; }
+
+  const table = type === 'channel' ? 'channels' : 'videos';
+  const { error } = await db.from(table).update({ niche: newNiche }).eq('id', id);
+  if (error) { showToast('Update failed: ' + error.message, 'error'); return; }
+
+  if (type === 'channel') {
+    const ch = allChannels.find(c => c.id === id);
+    if (ch) ch.niche = newNiche;
+    renderChannels();
+  } else {
+    const v = allVideos.find(v => v.id === id);
+    if (v) v.niche = newNiche;
+    renderVideos();
+  }
+  populateDynamicDropdowns();
+  showToast('Niche updated!', 'success');
+}
+
+function cancelNicheEdit(type) {
+  if (type === 'channel') renderChannels();
+  else renderVideos();
+}
+
+// ── Add Channel Modal ───────────────────────────────────────────────────────
+function switchModalTab(tab) {
+  document.getElementById('modal-single').style.display = tab === 'single' ? 'block' : 'none';
+  document.getElementById('modal-batch').style.display  = tab === 'batch'  ? 'block' : 'none';
+  document.getElementById('mtab-single').classList.toggle('active', tab === 'single');
+  document.getElementById('mtab-batch').classList.toggle('active',  tab === 'batch');
+  const btn = document.getElementById('add-submit-btn');
+  btn.textContent = tab === 'single' ? 'Add Channel' : 'Add All Channels';
+  btn.onclick = tab === 'single' ? submitChannel : submitBatchChannels;
+}
+
+function handleModalNicheChange(selId, customId) {
+  const sel    = document.getElementById(selId);
+  const custom = document.getElementById(customId);
+  custom.style.display = sel.value === '__custom__' ? 'block' : 'none';
+  if (sel.value === '__custom__') custom.focus();
+}
+
+function openAddChannel() {
+  populateDynamicDropdowns();
+  switchModalTab('single');
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('add-url').focus();
+}
+
+function closeAddChannel() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  ['add-url','add-name'].forEach(id => document.getElementById(id).value = '');
+  ['add-niche','batch-niche'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['add-niche-custom','batch-niche-custom'].forEach(id => { const el = document.getElementById(id); if (el) { el.value = ''; el.style.display = 'none'; } });
+  document.getElementById('batch-urls').value = '';
+  document.getElementById('batch-progress').textContent = '';
+  document.getElementById('add-error').style.display = 'none';
+  document.getElementById('add-success').style.display = 'none';
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeAddChannel();
+}
+
+function getNicheFromModal(selId, customId) {
+  const sel = document.getElementById(selId).value;
+  if (sel === '__custom__') return document.getElementById(customId).value.trim() || null;
+  return sel || null;
+}
+
+async function submitChannel() {
+  const url   = document.getElementById('add-url').value.trim();
+  const name  = document.getElementById('add-name').value.trim();
+  const niche = getNicheFromModal('add-niche', 'add-niche-custom');
+
+  const errEl = document.getElementById('add-error');
+  const sucEl = document.getElementById('add-success');
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+
+  if (!url || !name) { errEl.textContent = 'Channel URL and Name are required.'; errEl.style.display = 'block'; return; }
+  if (!url.includes('youtube.com') && !url.includes('youtu.be')) { errEl.textContent = 'Please enter a valid YouTube URL.'; errEl.style.display = 'block'; return; }
+
+  const btn = document.getElementById('add-submit-btn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+
+  const { data, error } = await db.from('channels').insert([{ name, url, niche }]).select();
+  btn.disabled = false; btn.textContent = 'Add Channel';
+
+  if (error) { errEl.textContent = 'Error: ' + error.message; errEl.style.display = 'block'; return; }
+
+  sucEl.textContent = name + ' added!';
+  sucEl.style.display = 'block';
+  allChannels.unshift(data[0]);
+  renderChannels();
+  populateChannelDropdown();
+  populateDynamicDropdowns();
+  setTimeout(closeAddChannel, 1500);
+  showToast(name + ' added!', 'success');
+}
+
+function guessNameFromUrl(url) {
+  const m = url.match(/@([^/?&#]+)/);
+  return m ? m[1] : '';
+}
+
+async function submitBatchChannels() {
+  const raw   = document.getElementById('batch-urls').value.trim();
+  const niche = getNicheFromModal('batch-niche', 'batch-niche-custom');
+  const urls  = raw.split('\n').map(u => u.trim()).filter(u => u.includes('youtube.com') || u.includes('youtu.be'));
+
+  const errEl  = document.getElementById('add-error');
+  const sucEl  = document.getElementById('add-success');
+  const progEl = document.getElementById('batch-progress');
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+
+  if (!urls.length) { errEl.textContent = 'No valid YouTube URLs found.'; errEl.style.display = 'block'; return; }
+
+  const btn = document.getElementById('add-submit-btn');
+  btn.disabled = true;
+
+  let added = 0, skipped = 0;
+  for (let i = 0; i < urls.length; i++) {
+    const url  = urls[i];
+    const name = guessNameFromUrl(url) || `Channel ${i + 1}`;
+    progEl.textContent = `Adding ${i + 1} of ${urls.length}: ${name}…`;
+    const { data, error } = await db.from('channels').insert([{ name, url, niche }]).select();
+    if (error) skipped++;
+    else { added++; allChannels.unshift(data[0]); }
+  }
+
+  btn.disabled = false;
+  progEl.textContent = '';
+  renderChannels();
+  populateChannelDropdown();
+  populateDynamicDropdowns();
+
+  const msg = `Added ${added} channel${added !== 1 ? 's' : ''}${skipped ? `, ${skipped} skipped` : ''}.`;
+  sucEl.textContent = msg;
+  sucEl.style.display = 'block';
+  showToast(msg, 'success');
+  setTimeout(closeAddChannel, 2000);
+}
+
+// ── Start ──────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
