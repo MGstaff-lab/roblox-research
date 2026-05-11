@@ -127,12 +127,20 @@
 
   /* Video filters */
   .video-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
-  .views-range { display: flex; align-items: center; gap: 6px; }
-  .views-range input[type=number] { width: 100px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; outline: none; -moz-appearance: textfield; }
-  .views-range input[type=number]::-webkit-outer-spin-button,
-  .views-range input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .views-range input[type=number]:focus { border-color: var(--accent); }
-  .views-range span { font-size: 0.78rem; color: var(--muted); }
+
+  /* Views range slider */
+  .views-filter-group { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+  .views-filter-header { display: flex; justify-content: space-between; align-items: center; }
+  .views-filter-label { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+  .views-filter-val { font-size: 0.78rem; font-weight: 600; color: var(--accent); }
+  .range-wrap { position: relative; height: 22px; display: flex; align-items: center; }
+  .range-track { position: absolute; left: 0; right: 0; height: 4px; background: var(--border); border-radius: 2px; pointer-events: none; }
+  .range-fill { position: absolute; height: 4px; background: var(--accent); border-radius: 2px; pointer-events: none; left: 0; width: 100%; }
+  .range-wrap input[type=range] { position: absolute; width: 100%; height: 4px; background: transparent; -webkit-appearance: none; appearance: none; pointer-events: none; outline: none; margin: 0; padding: 0; }
+  .range-wrap input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; pointer-events: all; border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+  .range-wrap input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; pointer-events: all; border: 2px solid var(--bg); }
+  #vid-min-slider { z-index: 3; }
+  #vid-max-slider { z-index: 4; }
   .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; color: var(--muted); text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
   .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
   .empty-state h3 { font-size: 1rem; margin-bottom: 6px; color: var(--text); }
@@ -250,10 +258,17 @@
     <select id="vid-niche" onchange="renderVideos()">
       <option value="">All Niches</option>
     </select>
-    <div class="views-range">
-      <input type="number" id="vid-min-views" placeholder="Min views" min="0" oninput="renderVideos()">
-      <span>—</span>
-      <input type="number" id="vid-max-views" placeholder="Max views" min="0" oninput="renderVideos()">
+    <div class="views-filter-group">
+      <div class="views-filter-header">
+        <span class="views-filter-label">Views</span>
+        <span class="views-filter-val" id="views-range-label">Any</span>
+      </div>
+      <div class="range-wrap">
+        <div class="range-track"></div>
+        <div class="range-fill" id="views-range-fill"></div>
+        <input type="range" id="vid-min-slider" min="0" max="100" value="0" oninput="onViewsSlider(event)">
+        <input type="range" id="vid-max-slider" min="0" max="100" value="100" oninput="onViewsSlider(event)">
+      </div>
     </div>
     <span class="stats-bar" id="vid-count"></span>
   </div>
@@ -343,6 +358,7 @@ let chSortDir = -1;
 let fetchedChannelData = null;
 let selectedChannelIds = new Set();
 let selectedVideoIds   = new Set();
+let viewsSliderMax = 10000000;
 
 // ── YouTube API ─────────────────────────────────────────────────────────────
 async function fetchYouTubeChannel(url) {
@@ -457,6 +473,7 @@ async function loadVideos() {
     offset += PAGE;
   }
   allVideos = all;
+  initViewsSlider();
   renderVideos();
 }
 
@@ -583,6 +600,49 @@ function renderChannels() {
   updateBatchBar();
 }
 
+// ── Views slider ───────────────────────────────────────────────────────────
+function sliderToViews(pos) {
+  if (pos === 0) return 0;
+  const logMax = Math.log10(viewsSliderMax);
+  return Math.round(Math.pow(10, logMax * pos / 100));
+}
+
+function initViewsSlider() {
+  if (!allVideos.length) return;
+  const maxV = Math.max(...allVideos.map(v => v.views || 0));
+  if (maxV > 0) viewsSliderMax = Math.pow(10, Math.ceil(Math.log10(maxV)));
+  updateViewsSliderUI();
+}
+
+function onViewsSlider(e) {
+  const minEl = document.getElementById('vid-min-slider');
+  const maxEl = document.getElementById('vid-max-slider');
+  let minVal = parseInt(minEl.value);
+  let maxVal = parseInt(maxEl.value);
+  if (minVal > maxVal) {
+    if (e.target === minEl) { minEl.value = maxVal; minVal = maxVal; }
+    else                    { maxEl.value = minVal; maxVal = minVal; }
+  }
+  minEl.style.zIndex = minVal > 95 ? 5 : 3;
+  updateViewsSliderUI();
+  renderVideos();
+}
+
+function updateViewsSliderUI() {
+  const minPos = parseInt(document.getElementById('vid-min-slider').value);
+  const maxPos = parseInt(document.getElementById('vid-max-slider').value);
+  const fill  = document.getElementById('views-range-fill');
+  const label = document.getElementById('views-range-label');
+  if (fill)  { fill.style.left = minPos + '%'; fill.style.width = (maxPos - minPos) + '%'; }
+  if (!label) return;
+  if (minPos === 0 && maxPos === 100) { label.textContent = 'Any'; return; }
+  const minV = sliderToViews(minPos);
+  const maxV = sliderToViews(maxPos);
+  if (minPos === 0)   label.textContent = 'Up to ' + fmtViews(maxV);
+  else if (maxPos === 100) label.textContent = fmtViews(minV) + '+';
+  else                label.textContent = fmtViews(minV) + ' — ' + fmtViews(maxV);
+}
+
 // ── Videos ─────────────────────────────────────────────────────────────────
 function populateChannelDropdown() {
   const sel = document.getElementById('vid-channel');
@@ -596,8 +656,10 @@ function renderVideos() {
   const dateDays   = parseInt(document.getElementById('vid-date').value) || 0;
   const chanFilter = document.getElementById('vid-channel').value;
   const nicheFilter= document.getElementById('vid-niche').value;
-  const minViews   = document.getElementById('vid-min-views').value !== '' ? parseInt(document.getElementById('vid-min-views').value) : null;
-  const maxViews   = document.getElementById('vid-max-views').value !== '' ? parseInt(document.getElementById('vid-max-views').value) : null;
+  const minSliderPos = parseInt(document.getElementById('vid-min-slider').value);
+  const maxSliderPos = parseInt(document.getElementById('vid-max-slider').value);
+  const minViews = minSliderPos > 0   ? sliderToViews(minSliderPos) : null;
+  const maxViews = maxSliderPos < 100 ? sliderToViews(maxSliderPos) : null;
 
   if (allVideos.length === 0) return;
 
