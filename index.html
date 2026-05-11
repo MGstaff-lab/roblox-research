@@ -229,7 +229,8 @@
     <div id="modal-single">
       <div class="form-group">
         <label>YouTube Channel URL *</label>
-        <input type="url" id="add-url" placeholder="https://youtube.com/@ChannelName">
+        <input type="url" id="add-url" placeholder="https://youtube.com/@ChannelName" onblur="autoFetchChannel()">
+        <div id="fetch-status" style="font-size:0.78rem;margin-top:5px;min-height:16px;"></div>
       </div>
       <div class="form-group">
         <label>Channel Name *</label>
@@ -275,6 +276,7 @@
 // ── Config ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://ahpzdwemvunyaumrnxal.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_NPPdURwPz_DEt6JG--haaw_CThnEoQF';
+const YT_API_KEY  = 'AIzaSyBX47DSTcr3ZOPtbmYIoG0ECvHw1VHHHis';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -282,6 +284,50 @@ let allChannels = [];
 let allVideos   = [];
 let chSortKey = 'subscribers';
 let chSortDir = -1;
+let fetchedChannelData = null;
+
+// ── YouTube API ─────────────────────────────────────────────────────────────
+async function fetchYouTubeChannel(url) {
+  const handleMatch  = url.match(/@([^/?&#]+)/);
+  const channelMatch = url.match(/\/channel\/(UC[^/?&#]+)/);
+  let params;
+  if (handleMatch)       params = `forHandle=@${handleMatch[1]}`;
+  else if (channelMatch) params = `id=${channelMatch[1]}`;
+  else return null;
+
+  try {
+    const resp = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&${params}&key=${YT_API_KEY}`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (!data.items || !data.items.length) return null;
+    const item = data.items[0];
+    return {
+      name:         item.snippet.title,
+      subscribers:  parseInt(item.statistics.subscriberCount) || null,
+      date_started: item.snippet.publishedAt ? item.snippet.publishedAt.split('T')[0] : null
+    };
+  } catch { return null; }
+}
+
+async function autoFetchChannel() {
+  const url      = document.getElementById('add-url').value.trim();
+  const statusEl = document.getElementById('fetch-status');
+  const nameEl   = document.getElementById('add-name');
+  fetchedChannelData = null;
+  if (!url || (!url.includes('youtube.com') && !url.includes('youtu.be'))) return;
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Fetching channel info…';
+  const info = await fetchYouTubeChannel(url);
+  if (!info) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Could not fetch — enter name manually.';
+    return;
+  }
+  fetchedChannelData = info;
+  nameEl.value = info.name;
+  statusEl.style.color = 'var(--green)';
+  statusEl.textContent = `✓ ${info.name} · ${info.subscribers ? fmtSubs(info.subscribers) + ' subs' : 'subs hidden'}`;
+}
 
 // ── Niche helpers ───────────────────────────────────────────────────────────
 const PRESET_NICHES = ['Escape Tsunami Brainrot', 'Troll Tower', '99 Nights in the Forest'];
@@ -603,6 +649,8 @@ function closeAddChannel() {
   document.getElementById('batch-progress').textContent = '';
   document.getElementById('add-error').style.display = 'none';
   document.getElementById('add-success').style.display = 'none';
+  document.getElementById('fetch-status').textContent = '';
+  fetchedChannelData = null;
 }
 
 function closeModal(e) {
@@ -631,7 +679,11 @@ async function submitChannel() {
   const btn = document.getElementById('add-submit-btn');
   btn.disabled = true; btn.textContent = 'Adding…';
 
-  const { data, error } = await db.from('channels').insert([{ name, url, niche }]).select();
+  const record = { name, url, niche,
+    subscribers:  fetchedChannelData?.subscribers  || null,
+    date_started: fetchedChannelData?.date_started || null
+  };
+  const { data, error } = await db.from('channels').insert([record]).select();
   btn.disabled = false; btn.textContent = 'Add Channel';
 
   if (error) { errEl.textContent = 'Error: ' + error.message; errEl.style.display = 'block'; return; }
@@ -669,10 +721,16 @@ async function submitBatchChannels() {
 
   let added = 0, skipped = 0;
   for (let i = 0; i < urls.length; i++) {
-    const url  = urls[i];
-    const name = guessNameFromUrl(url) || `Channel ${i + 1}`;
+    const url = urls[i];
+    progEl.textContent = `Fetching info ${i + 1} of ${urls.length}…`;
+    const info = await fetchYouTubeChannel(url);
+    const name = info?.name || guessNameFromUrl(url) || `Channel ${i + 1}`;
     progEl.textContent = `Adding ${i + 1} of ${urls.length}: ${name}…`;
-    const { data, error } = await db.from('channels').insert([{ name, url, niche }]).select();
+    const record = { name, url, niche,
+      subscribers:  info?.subscribers  || null,
+      date_started: info?.date_started || null
+    };
+    const { data, error } = await db.from('channels').insert([record]).select();
     if (error) skipped++;
     else { added++; allChannels.unshift(data[0]); }
   }
