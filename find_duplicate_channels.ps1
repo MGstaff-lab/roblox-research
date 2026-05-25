@@ -4,35 +4,51 @@ $sbHdr  = @{ apikey = $SB_KEY; Authorization = "Bearer $SB_KEY" }
 
 Write-Host '=== Finding duplicate channels ==='
 
-$r        = Invoke-WebRequest -Uri ($SB_URL + '/channels?select=id,name,url,niche,subscribers&limit=1000') -Headers $sbHdr -UseBasicParsing
-$channels = @($r.Content | ConvertFrom-Json)
+# Load channels - use JavaScriptSerializer to avoid PS 5.1 ConvertFrom-Json quirks
+$r = Invoke-WebRequest -Uri ($SB_URL + '/channels?select=id,name,url,niche,subscribers&limit=1000') -Headers $sbHdr -UseBasicParsing
+
+[void][System.Reflection.Assembly]::LoadWithPartialName('System.Web.Extensions')
+$ser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+$ser.MaxJsonLength = [int]::MaxValue
+$raw = $ser.DeserializeObject($r.Content)
+
+# Convert ArrayList of Hashtables to PSCustomObjects
+$channels = @($raw | ForEach-Object {
+    [PSCustomObject]@{
+        id          = $_['id']
+        name        = $_['name']
+        url         = $_['url']
+        niche       = $_['niche']
+        subscribers = $_['subscribers']
+    }
+})
+
 Write-Host ('Total channels in Supabase: ' + $channels.Count)
 
-# Group by lowercased name
-$byName = @{}
-foreach ($ch in $channels) {
-    $key = $ch.name.Trim().ToLower()
-    if (-not $byName.ContainsKey($key)) { $byName[$key] = [System.Collections.Generic.List[object]]::new() }
-    $byName[$key].Add($ch)
-}
+# Group by lowercased name to find duplicates
+$groups = $channels | Group-Object { $_.name.Trim().ToLower() } | Where-Object { $_.Count -gt 1 } | Sort-Object Name
 
-$dupes = $byName.GetEnumerator() | Where-Object { $_.Value.Count -gt 1 } | Sort-Object { $_.Value[0].name }
-
-if ($dupes.Count -eq 0) {
+if ($groups.Count -eq 0) {
     Write-Host 'No duplicate channel names found.'
-} else {
-    Write-Host ("`nFound " + $dupes.Count + ' duplicate group(s):')
-    Write-Host ('=' * 70)
-    foreach ($g in $dupes) {
-        Write-Host ("`nName: [" + $g.Value[0].name + "]")
-        foreach ($ch in $g.Value) {
-            Write-Host ('  ID       : ' + $ch.id)
-            Write-Host ('  URL      : ' + $ch.url)
-            Write-Host ('  Niche    : ' + $ch.niche)
-            Write-Host ('  Subs     : ' + $ch.subscribers)
-            Write-Host ''
-        }
-    }
-    Write-Host ('=' * 70)
-    Write-Host ("`nTotal duplicate entries: " + ($dupes | ForEach-Object { $_.Value.Count - 1 } | Measure-Object -Sum).Sum + ' extra row(s) to remove')
+    exit 0
 }
+
+Write-Host ("`nFound " + $groups.Count + ' duplicate group(s):')
+Write-Host ('=' * 70)
+
+foreach ($g in $groups) {
+    Write-Host ("`nDUPLICATE: [" + $g.Group[0].name + "]  (" + $g.Count + " entries)")
+    $i = 1
+    foreach ($ch in $g.Group) {
+        Write-Host ("  [$i] ID   : " + $ch.id)
+        Write-Host ("      URL  : " + $ch.url)
+        Write-Host ("      Niche: " + $ch.niche)
+        Write-Host ("      Subs : " + $ch.subscribers)
+        $i++
+    }
+}
+
+Write-Host ''
+Write-Host ('=' * 70)
+$extraCount = ($groups | ForEach-Object { $_.Count - 1 } | Measure-Object -Sum).Sum
+Write-Host ("$extraCount duplicate row(s) to remove across $($groups.Count) channel(s)")
