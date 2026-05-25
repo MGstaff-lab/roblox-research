@@ -455,7 +455,9 @@ function populateDynamicDropdowns() {
     const el = document.getElementById(id);
     if (!el) return;
     const prev = el.value;
-    el.innerHTML = '<option value="">All Niches</option>' + filterOpts;
+    const hasUnknownChannels = allChannels.some(c => !c.niche);
+    const unknownOpt = hasUnknownChannels ? '<option value="Unknown">Unknown</option>' : '';
+    el.innerHTML = '<option value="">All Niches</option>' + filterOpts + unknownOpt;
     if (prev) el.value = prev;
   });
 
@@ -579,7 +581,10 @@ function renderChannels() {
   const niche  = document.getElementById('ch-niche').value;
 
   let rows = allChannels.filter(ch => {
-    if (niche && ch.niche !== niche) return false;
+    if (niche) {
+      if (niche === 'Unknown') { if (ch.niche) return false; }
+      else if (ch.niche !== niche) return false;
+    }
     if (query) {
       const hay = ((ch.name || '') + ' ' + (ch.niche || '')).toLowerCase();
       if (!hay.includes(query)) return false;
@@ -641,7 +646,10 @@ function toggleNichePanel(e) {
 
 function renderNicheFilterList() {
   const niches = getAllNiches();
-  document.getElementById('niche-filter-list').innerHTML = niches.map(n => {
+  // Append 'Unknown' if any video has a null/empty niche
+  const hasUnknown = allVideos.some(v => !v.niche);
+  const filterNiches = hasUnknown ? [...niches, 'Unknown'] : niches;
+  document.getElementById('niche-filter-list').innerHTML = filterNiches.map(n => {
     const state = nicheFilterState.get(n) || 'neutral';
     const icon  = state === 'include' ? '✓' : state === 'exclude' ? '✕' : '';
     return `<div class="niche-filter-item" data-niche="${n.replace(/"/g,'&quot;')}" onclick="handleNicheItemClick(this)">
@@ -761,8 +769,9 @@ function renderVideos() {
 
   let rows = allVideos.filter(v => {
     if (chanFilter && v.channel_name !== chanFilter) return false;
-    if (excludedNiches.length && excludedNiches.includes(v.niche)) return false;
-    if (includedNiches.length && !includedNiches.includes(v.niche)) return false;
+    const effectiveNiche = v.niche || 'Unknown';
+    if (excludedNiches.length && excludedNiches.includes(effectiveNiche)) return false;
+    if (includedNiches.length && !includedNiches.includes(effectiveNiche)) return false;
     if (query && !(v.title || '').toLowerCase().includes(query)) return false;
     if (excludeKws.length && excludeKws.some(kw => (v.title || '').toLowerCase().includes(kw))) return false;
     if (cutoff && v.published_date && new Date(v.published_date) < cutoff) return false;
