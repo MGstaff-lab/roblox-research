@@ -1,0 +1,129 @@
+{
+  "status": "partial - rate limited during collection",
+  "cutoffDate": "2026-05-11",
+  "collectedAt": "2026-05-25",
+
+  "channelResults": {
+    "RobloxiniRants": {
+      "channelId": "UCbdiWfYVFpLVcmsN8IdzxvA",
+      "status": "complete",
+      "qualifyingShorts": [
+        {
+          "videoId": "nCZ2AQJIJyA",
+          "title": "He Realized He Was Accepted To Harvard 6 Years Later 😱",
+          "viewCountText": "30K views",
+          "views": 30000,
+          "publishDate": "2026-05-21",
+          "thumbnailUrl": "https://i.ytimg.com/vi/nCZ2AQJIJyA/maxres2.jpg"
+        },
+        {
+          "videoId": "DCdy20KXIGY",
+          "title": "One Tweet Ruined Her NASA Career 😱",
+          "viewCountText": "29K views",
+          "views": 29000,
+          "publishDate": "2026-05-20",
+          "thumbnailUrl": "https://i.ytimg.com/vi/DCdy20KXIGY/maxres2.jpg"
+        },
+        {
+          "videoId": "AIEetE9S6fo",
+          "title": "He Dropped A Squidward Statue Underwater 🤫",
+          "viewCountText": "65K views",
+          "views": 65000,
+          "publishDate": "2026-05-18",
+          "thumbnailUrl": "https://i.ytimg.com/vi/AIEetE9S6fo/maxres2.jpg"
+        },
+        {
+          "videoId": "um3qLLYqE1o",
+          "title": "He Tried The One Punch Man Workout For 3 Years 👊",
+          "viewCountText": "32K views",
+          "views": 32000,
+          "publishDate": "2026-05-17",
+          "thumbnailUrl": "https://i.ytimg.com/vi/um3qLLYqE1o/maxres2.jpg"
+        },
+        {
+          "videoId": "BP6Ry_gx4KI",
+          "title": "She Catched The Airline Lying 😱",
+          "viewCountText": "39K views",
+          "views": 39000,
+          "publishDate": "2026-05-12",
+          "thumbnailUrl": "https://i.ytimg.com/vi/BP6Ry_gx4KI/maxres2.jpg"
+        },
+        {
+          "videoId": "o9dm_SDpZtk",
+          "title": "She Accidentally Stole An $8,000 Couch 😳",
+          "viewCountText": "72K views",
+          "views": 72000,
+          "publishDate": "2026-05-11",
+          "thumbnailUrl": "https://i.ytimg.com/vi/o9dm_SDpZtk/maxres2.jpg"
+        }
+      ]
+    },
+    "MikeRoblox": {
+      "channelId": "UCxHxDmzFSOuYmRwMHec8g7g",
+      "status": "complete",
+      "newestShortDate": "2026-04-21",
+      "qualifyingShorts": []
+    },
+    "Dasheeeer": {
+      "channelId": "UCfbUZsAY5HEgHl36c44gyfQ",
+      "status": "complete - no Shorts tab",
+      "qualifyingShorts": []
+    },
+    "Roozoo Roblox": {
+      "channelId": "UCRIkgHU8G_LAGvI-bwNrO8g",
+      "status": "complete",
+      "newestShortDate": "2026-03-27",
+      "qualifyingShorts": []
+    },
+    "Roblox Crash Cam": {
+      "channelId": "UCeFyhECmAeKzl2mnD9uwGzQ",
+      "status": "complete",
+      "newestShortDate": "2026-03-23",
+      "qualifyingShorts": []
+    },
+    "AndyRants": {
+      "channelId": "UCj_-MuLnLxMTQZslsirwxJw",
+      "status": "complete",
+      "newestShortDate": "2026-05-08",
+      "qualifyingShorts": []
+    },
+    "RankingRobloxclipz": {
+      "channelId": "UC0FMS-NvJS0wWaI5rlS2njA",
+      "status": "pending - rate limited",
+      "newestShortDate": "2026-05-24",
+      "totalShorts": 48,
+      "qualifyingShorts": "TBD"
+    },
+    "FhyonRoblox": {
+      "channelId": "UCxtFY31vVXX6_zO3j3qDXBQ",
+      "status": "pending - rate limited",
+      "newestShortDate": "2026-05-25",
+      "totalShorts": 48,
+      "qualifyingShorts": "TBD"
+    },
+    "Jack Rants": {
+      "channelId": "UCkJLzlgCp7yGU0XbztBOAMA",
+      "status": "pending - rate limited",
+      "newestShortDate": "2026-05-25",
+      "totalShorts": 31,
+      "qualifyingShorts": "TBD"
+    },
+    "ELGATO GAMING": {
+      "channelId": "UC3Ly59N-1VdKSBINCfBnb2g",
+      "status": "pending - rate limited",
+      "newestShortDate": "2026-05-22",
+      "totalShorts": 48,
+      "qualifyingShorts": "TBD"
+    },
+    "PandaRants": {
+      "channelId": "UC1fK6HxzI8sX6ehfs8i7nGg",
+      "status": "pending - rate limited",
+      "newestShortDate": "2026-05-24",
+      "totalShorts": 48,
+      "apiChannelTitle": "red hair",
+      "qualifyingShorts": "TBD"
+    }
+  },
+
+  "downChannels": []
+}
