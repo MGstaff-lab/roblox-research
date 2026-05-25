@@ -113,7 +113,11 @@ function Get-YtRef($url) {
 }
 
 function Escape-JS([string]$s) {
-    return $s -replace '\\','\\' -replace "'","\\'" -replace "`n",' ' -replace "`r",''
+    $s = $s -replace '\\', '\\'   # \ → \\ (one literal backslash → two, for JS)
+    $s = $s -replace "'",  "\'"   # ' → \' (apostrophe → escaped, for JS single-quoted strings)
+    $s = $s -replace "`n", ' '
+    $s = $s -replace "`r", ''
+    return $s
 }
 
 function Parse-ISODuration([string]$dur) {
@@ -270,17 +274,25 @@ foreach ($v in $sorted) {
         $curCh = $v.channelName
         $lines.Add("  // -- $curCh --")
     }
-    $t  = Escape-JS $v.title
-    $th = Escape-JS $v.thumbnailUrl
-    $lines.Add("  { title: '$(Escape-JS $t)', channelName: '$($v.channelName)', channelUrl: '$($v.channelUrl)', views: $($v.views), publishedDate: '$($v.publishedDate)', thumbnailUrl: '$th', url: '$($v.url)', niche: null },")
+    $t   = Escape-JS $v.title
+    $th  = Escape-JS $v.thumbnailUrl
+    $cn  = Escape-JS $v.channelName
+    $lines.Add("  { title: '$t', channelName: '$cn', channelUrl: '$($v.channelUrl)', views: $($v.views), publishedDate: '$($v.publishedDate)', thumbnailUrl: '$th', url: '$($v.url)', niche: null },")
 }
 $lines.Add('')
 
-$content = Get-Content $DATA_JS -Raw -Encoding UTF8
-$content = [regex]::Replace($content, '// Last updated: \d{4}-\d{2}-\d{2}', ('// Last updated: ' + (Get-Date -Format 'yyyy-MM-dd')))
+$raw     = Get-Content $DATA_JS -Raw -Encoding UTF8
+# Update date header via regex (safe — date format is unique)
+$raw     = [regex]::Replace($raw, '// Last updated: \d{4}-\d{2}-\d{2}', ('// Last updated: ' + (Get-Date -Format 'yyyy-MM-dd')))
+
+# Replace VIDEOS block using string index split — avoids regex matching titles
+$marker  = 'const VIDEOS = ['
+$idx     = $raw.IndexOf($marker)
+if ($idx -lt 0) { Write-Host 'ERROR: VIDEOS marker not found in data.js'; exit 1 }
+$prefix  = $raw.Substring(0, $idx)
 $newBlock = $lines -join "`n"
-$content  = [regex]::Replace($content, '(?s)(const VIDEOS = \[).*?(\];)', "`$1`n$newBlock`$2")
-[System.IO.File]::WriteAllText($DATA_JS, $content, [System.Text.Encoding]::UTF8)
+$newFile  = $prefix + $marker + "`n" + $newBlock + "`n];"
+[System.IO.File]::WriteAllText($DATA_JS, $newFile, [System.Text.Encoding]::UTF8)
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 Write-Host ""
