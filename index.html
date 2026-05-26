@@ -143,6 +143,12 @@
   .niche-clear-btn { width: 100%; margin-top: 6px; padding: 6px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.78rem; cursor: pointer; }
   .niche-clear-btn:hover { color: var(--text); border-color: var(--text); }
 
+  /* Custom date range */
+  .custom-date-wrap { display: none; align-items: center; gap: 6px; }
+  .custom-date-wrap input[type=date] { padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; outline: none; color-scheme: dark; transition: border-color .15s; }
+  .custom-date-wrap input[type=date]:focus { border-color: var(--accent); }
+  .custom-date-sep { color: var(--muted); font-size: 0.8rem; }
+
   /* Exclude keywords */
   .excl-kw-wrap { position: relative; }
   .excl-kw-wrap::before { content: "✕"; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--red); font-size: 0.7rem; pointer-events: none; opacity: 0.7; }
@@ -262,7 +268,7 @@
       <option value="date_desc">Newest First</option>
       <option value="date_asc">Oldest First</option>
     </select>
-    <select id="vid-date" onchange="renderVideos()">
+    <select id="vid-date" onchange="onDateSelectChange()">
       <option value="">All Time</option>
       <option value="1">Last 24 hours</option>
       <option value="7">Last 7 days</option>
@@ -273,7 +279,13 @@
       <option value="180">Last 6 months</option>
       <option value="365">Last 1 year</option>
       <option value="730">Last 2 years</option>
+      <option value="custom">Custom range…</option>
     </select>
+    <div class="custom-date-wrap" id="custom-date-wrap">
+      <input type="date" id="vid-date-from" onchange="renderVideos()" title="Start date">
+      <span class="custom-date-sep">—</span>
+      <input type="date" id="vid-date-to" onchange="renderVideos()" title="End date">
+    </div>
     <select id="vid-channel" onchange="renderVideos()">
       <option value="">All Channels</option>
     </select>
@@ -700,6 +712,14 @@ document.addEventListener('click', e => {
   if (wrap && !wrap.contains(e.target)) document.getElementById('niche-filter-panel').classList.remove('open');
 });
 
+// ── Date filter ─────────────────────────────────────────────────────────────
+function onDateSelectChange() {
+  const val = document.getElementById('vid-date').value;
+  const wrap = document.getElementById('custom-date-wrap');
+  wrap.style.display = val === 'custom' ? 'flex' : 'none';
+  renderVideos();
+}
+
 // ── Views slider ───────────────────────────────────────────────────────────
 function sliderToViews(pos) {
   if (pos === 0) return 0;
@@ -753,7 +773,10 @@ function populateChannelDropdown() {
 function renderVideos() {
   const query      = document.getElementById('vid-search').value.trim().toLowerCase();
   const sortVal    = document.getElementById('vid-sort').value;
-  const dateDays   = parseInt(document.getElementById('vid-date').value) || 0;
+  const dateVal    = document.getElementById('vid-date').value;
+  const dateDays   = dateVal !== 'custom' ? (parseInt(dateVal) || 0) : 0;
+  const customFrom = dateVal === 'custom' ? (document.getElementById('vid-date-from').value || null) : null;
+  const customTo   = dateVal === 'custom' ? (document.getElementById('vid-date-to').value   || null) : null;
   const chanFilter = document.getElementById('vid-channel').value;
   const minSliderPos = parseInt(document.getElementById('vid-min-slider').value);
   const maxSliderPos = parseInt(document.getElementById('vid-max-slider').value);
@@ -774,7 +797,9 @@ function renderVideos() {
     if (includedNiches.length && !includedNiches.includes(effectiveNiche)) return false;
     if (query && !(v.title || '').toLowerCase().includes(query)) return false;
     if (excludeKws.length && excludeKws.some(kw => (v.title || '').toLowerCase().includes(kw))) return false;
-    if (cutoff && v.published_date && new Date(v.published_date) < cutoff) return false;
+    if (customFrom && v.published_date && v.published_date < customFrom) return false;
+    if (customTo   && v.published_date && v.published_date > customTo)   return false;
+    if (!customFrom && !customTo && cutoff && v.published_date && new Date(v.published_date) < cutoff) return false;
     if (minViews !== null && (v.views || 0) < minViews) return false;
     if (maxViews !== null && (v.views || 0) > maxViews) return false;
     return true;
